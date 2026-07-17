@@ -11,13 +11,18 @@ let package = Package(
         .visionOS(.v2),
     ],
     products: [
-        .library(name: "AemiTesting", targets: ["AemiTesting"])
+        .library(name: "AemiConcurrency", targets: ["AemiConcurrency"]),
+        .library(name: "AemiTesting", targets: ["AemiTesting"]),
     ],
     targets: [
-        .target(name: "AemiTesting"),
+        .target(name: "AemiConcurrency"),
+        .target(
+            name: "AemiTesting",
+            dependencies: ["AemiConcurrency"]
+        ),
         .testTarget(
             name: "AemiTestingTests",
-            dependencies: ["AemiTesting"]
+            dependencies: ["AemiConcurrency", "AemiTesting"]
         ),
     ],
     swiftLanguageModes: [.v6]
