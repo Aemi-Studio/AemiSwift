@@ -1,9 +1,12 @@
-# AemiSwift
+# AemiSwift compatibility package
 
-Battle-tested Swift testing helpers for async/concurrent code on Apple
-platforms. Four typed primitives that replace `Task.sleep`,
-`Task.yield`, and `Task.megaYield` with deterministic, event-driven
-rendezvous through Swift Concurrency's continuation machinery.
+The implementation now lives in [Aemi](https://github.com/Aemi-Studio/aemi).
+This package preserves the `AemiConcurrency` and `AemiTesting` products and imports
+using the published Aemi `main` branch, without duplicate runtime or testing code.
+For new code, select Aemi's `AemiCore` and `AemiTesting` products directly.
+
+Swift 6.3+ is required by Aemi. Platform minimums remain iOS 18, macOS 15,
+tvOS 18, watchOS 11, and visionOS 2.
 
 ## Why
 
@@ -17,7 +20,8 @@ ordering bugs without fixing them.
 The primitives in `AemiTesting` route entirely through
 `CheckedContinuation` + `Synchronization.Mutex`. They resume the
 awaiting test the *instant* the production side fires the signal —
-no polling, no timeout, no scheduler dependency.
+no polling. Task-provider waits use configurable deadlines and report an error
+when work does not finish.
 
 ## Primitives
 
