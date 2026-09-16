@@ -61,9 +61,8 @@ struct TestClockTests {
         try await task.value
     }
 
-    @Test func waitForSleepersResolvesWhenNAdditionalRegister() async throws {
-        // Tests "N more" semantics — pre-existing sleepers don't
-        // satisfy a fresh waitForSleepers call.
+    @Test func waitForSleepersWaitsForTheRequestedQueueSize() async throws {
+        // Existing sleepers contribute to the queue threshold.
         let clock = TestClock()
         let firstSleeperGate = TaskGate()
 
@@ -72,8 +71,7 @@ struct TestClockTests {
             firstSleeperGate.open()
         }
         try await clock.waitForSleepers()  // first registers
-        // First sleeper is queued. A new waitForSleepers(count: 2)
-        // must wait for 2 MORE, not return immediately on queue size.
+        // Wait for three total sleepers while the first remains queued.
 
         let resumeOne = TaskGate()
         let resumeTwo = TaskGate()
@@ -85,7 +83,7 @@ struct TestClockTests {
             try await clock.sleep(for: .milliseconds(300))
             resumeTwo.open()
         }
-        try await clock.waitForSleepers(count: 2)
+        try await clock.waitForSleepers(count: 3)
         // All three sleepers registered. Advance past the latest.
         clock.advance(by: .milliseconds(300))
         try await firstSleeperGate.wait()
@@ -119,12 +117,14 @@ struct TestClockTests {
         let clock = TestClock()
         let probe = AsyncProbe<Int>()
 
+        var sleepers: [Task<Void, any Error>] = []
         for i in 0..<5 {
-            Task {
+            sleepers.append(Task {
                 try await clock.sleep(for: .milliseconds(100))
                 probe.send(i)
-            }
+            })
         }
+        defer { for sleeper in sleepers { sleeper.cancel() } }
         try await clock.waitForSleepers(count: 5)
         clock.advance(by: .milliseconds(100))
 
@@ -137,6 +137,7 @@ struct TestClockTests {
                 received.insert(value)
             }
         }
+        for sleeper in sleepers { try await sleeper.value }
         #expect(received == Set(0..<5))
         try probe.expectNoBufferedElements()
     }

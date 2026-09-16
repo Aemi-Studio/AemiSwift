@@ -72,19 +72,15 @@ queued — and when the Task finally calls `sleep`, the new deadline
 lives in the future relative to the already-advanced clock, so the
 sleeper waits forever.
 
-`Task.yield()` before `advance` "fixes" this in practice but is
-non-deterministic under load. `waitForSleepers(count:)` is a
-`CheckedContinuation` resolved *only* when the requested number of
-additional sleepers have been appended to the queue — pure
-event-driven rendezvous, scheduler-independent.
+`waitForSleepers(count:)` observes the current queue and suspends until the
+requested number of sleepers is present. Existing sleepers count toward the
+threshold, so scheduling order cannot lose a registration.
 
-## "N more" semantics
+## Queue threshold
 
-`waitForSleepers(count: N)` waits for N **additional** sleepers past
-whatever was queued at registration time. Mid-test composition (test
-already gated on one sleeper, then wants to wait for the next 2) is
-the canonical case; a queue-size threshold would trip immediately on
-existing entries.
+After waiting for one sleeper, use `waitForSleepers(count: 3)` to wait for two
+more while the first remains queued. This replaces the earlier "N more"
+behavior, which could hang if tasks registered before the waiter ran.
 
 ## Integration patterns
 
@@ -143,8 +139,7 @@ Canonical design decisions:
 - **`<Void, any Error>` continuation type** — cleaner cancellation
   surface than `<Void, Never>` with a downstream `checkCancellation`
   dance. Error surfaces at the actual call site.
-- **Per-waiter "N more" decrement** — matches the human intent of
-  every realistic call site (rationale above).
+- **Queue-size threshold** — includes registrations that preceded the wait.
 - **Resume continuations outside the lock** — non-negotiable safety
   property; resuming inside `Mutex.withLock` can re-enter the
   awaiter's actor while the lock is held, deadlocking the system.
