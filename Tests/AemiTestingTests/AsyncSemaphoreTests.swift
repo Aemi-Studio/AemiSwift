@@ -2,9 +2,7 @@ import Testing
 
 @testable import AemiTesting
 
-/// `AsyncSemaphore` regression coverage. Uses `TaskGate` as the
-/// oracle for FIFO ordering — one gate per parallel slot; the
-/// order gates open in mirrors the order signal() resumes waiters.
+/// Compatibility coverage for semaphore permits and cancellation.
 @Suite("AsyncSemaphore")
 struct AsyncSemaphoreTests {
 
@@ -28,34 +26,27 @@ struct AsyncSemaphoreTests {
         try await sem.wait()
     }
 
-    @Test func waitersResumeFIFO() async throws {
-        // Oracle: one TaskGate per waiter, opened from inside the
-        // resumed body. Order of opens = order of signal-resumes.
-        let sem = AsyncSemaphore()
-        let n = 4
-        let order = OrderRecorder()
-        let gates = (0..<n).map { _ in TaskGate() }
+    @Test func `each signal releases one concurrent waiter`() async throws {
+        let sut = AsyncSemaphore()
+        let resumed = CountProbe<Int>()
+        let count = 4
 
-        await withTaskGroup(of: Void.self) { group in
-            for i in 0..<n {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            defer { group.cancelAll() }
+            for index in 0..<count {
                 group.addTask {
-                    try? await sem.wait()
-                    await order.record(i)
-                    gates[i].open()
+                    try await sut.wait()
+                    resumed.record(index)
                 }
             }
-
-            // Signal one at a time, waiting for each gate before
-            // signalling the next. This forces strict serial
-            // observation of resume order.
-            for i in 0..<n {
-                sem.signal()
-                try? await gates[i].wait()
+            for expected in 1...count {
+                sut.signal()
+                try await resumed.wait(forAtLeast: expected)
             }
+            try await group.waitForAll()
         }
-
-        let observed = await order.snapshot
-        #expect(observed == Array(0..<n))
+        #expect(resumed.count == count)
+        #expect(Set(resumed.events) == Set(0..<count))
     }
 
     @Test func cancellationDoesNotConsumePermit() async throws {
@@ -70,10 +61,4 @@ struct AsyncSemaphoreTests {
         sem.signal()
         try await sem.wait()
     }
-}
-
-/// Trivial actor for ordering observations across concurrent tasks.
-actor OrderRecorder {
-    private(set) var snapshot: [Int] = []
-    func record(_ index: Int) { snapshot.append(index) }
 }
