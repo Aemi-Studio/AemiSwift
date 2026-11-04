@@ -11,7 +11,7 @@ let package = Package(
     .library(name: "AemiTesting", targets: ["AemiTestingCompatibility"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/Aemi-Studio/aemi.git", revision: "921fd8d037855844e188b1b9e18a41773c7b9508")
+    .package(url: "https://github.com/Aemi-Studio/aemi.git", revision: "ca34b52c646abb2dc46125f9a7d42ba524823b32")
   ],
   targets: [
     .target(
